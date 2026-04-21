@@ -1,17 +1,16 @@
 /**
  * BookMyStayApp
  *
- * UC5: Booking Request using Queue (FIFO)
- * Demonstrates fair request handling without allocation.
+ * UC6: Reservation Confirmation & Room Allocation
+ * Ensures no double booking using Set and synchronized inventory updates.
  *
  * @author Mahathi
  * @version 1.0
  */
 
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.*;
 
-// Reservation class (represents a booking request)
+// Reservation request
 class Reservation {
     private String guestName;
     private String roomType;
@@ -30,28 +29,72 @@ class Reservation {
     }
 }
 
-// Booking Request Queue (FIFO)
-class BookingQueue {
+// Inventory Service
+class RoomInventory {
+    private HashMap<String, Integer> availability;
+
+    public RoomInventory() {
+        availability = new HashMap<>();
+        availability.put("Single Room", 2);
+        availability.put("Double Room", 1);
+        availability.put("Suite Room", 1);
+    }
+
+    public int getAvailability(String type) {
+        return availability.getOrDefault(type, 0);
+    }
+
+    public void reduceAvailability(String type) {
+        availability.put(type, availability.get(type) - 1);
+    }
+}
+
+// Booking Service
+class BookingService {
 
     private Queue<Reservation> queue;
+    private HashMap<String, Set<String>> allocatedRooms;
 
-    public BookingQueue() {
+    public BookingService() {
         queue = new LinkedList<>();
+        allocatedRooms = new HashMap<>();
     }
 
-    // Add booking request
-    public void addRequest(Reservation reservation) {
-        queue.add(reservation);
-        System.out.println("Request added: " + reservation.getGuestName()
-                + " → " + reservation.getRoomType());
+    // Add request
+    public void addRequest(Reservation r) {
+        queue.add(r);
     }
 
-    // Display all requests (without processing)
-    public void displayQueue() {
-        System.out.println("\n===== Booking Queue =====");
+    // Process bookings
+    public void processBookings(RoomInventory inventory) {
 
-        for (Reservation r : queue) {
-            System.out.println(r.getGuestName() + " → " + r.getRoomType());
+        System.out.println("===== Processing Bookings =====");
+
+        while (!queue.isEmpty()) {
+
+            Reservation r = queue.poll();
+            String type = r.getRoomType();
+
+            if (inventory.getAvailability(type) > 0) {
+
+                // Generate unique room ID
+                String roomId = type.replace(" ", "") + "_" + UUID.randomUUID().toString().substring(0, 5);
+
+                // Store in set
+                allocatedRooms.putIfAbsent(type, new HashSet<>());
+                allocatedRooms.get(type).add(roomId);
+
+                // Update inventory
+                inventory.reduceAvailability(type);
+
+                System.out.println("Booking Confirmed: " + r.getGuestName());
+                System.out.println("Room Type: " + type);
+                System.out.println("Room ID: " + roomId);
+                System.out.println("---------------------------");
+
+            } else {
+                System.out.println("Booking Failed (No Availability): " + r.getGuestName() + " → " + type);
+            }
         }
     }
 }
@@ -60,15 +103,18 @@ public class BookMyStayApp {
 
     public static void main(String[] args) {
 
-        // Initialize queue
-        BookingQueue bookingQueue = new BookingQueue();
+        // Inventory
+        RoomInventory inventory = new RoomInventory();
 
-        // Simulate incoming requests
-        bookingQueue.addRequest(new Reservation("Mahathi", "Single Room"));
-        bookingQueue.addRequest(new Reservation("Aarav", "Suite Room"));
-        bookingQueue.addRequest(new Reservation("Dhruv", "Double Room"));
+        // Booking service
+        BookingService service = new BookingService();
 
-        // Display queue (FIFO order)
-        bookingQueue.displayQueue();
+        // Add requests (FIFO)
+        service.addRequest(new Reservation("Mahathi", "Single Room"));
+        service.addRequest(new Reservation("Aarav", "Single Room"));
+        service.addRequest(new Reservation("Dhruv", "Single Room")); // should fail
+
+        // Process bookings
+        service.processBookings(inventory);
     }
 }
